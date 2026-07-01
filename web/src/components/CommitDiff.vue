@@ -127,6 +127,25 @@ let props = defineProps({
 /** @type {Vue.Ref<FileDiff[] | null>} */
 let file_diffs = ref(null)
 
+/**
+ * Expand git's compact rename spec into its old and new paths.
+ * Handles `dir/{old => new}/file`, `{old => new}/file`, `dir/{ => new}/file`,
+ * `dir/{old => }/file` and the plain `old => new` form.
+ * @type {(spec: string) => { old_path: string, new_path: string }}
+ */
+function split_rename(spec) {
+	let brace = spec.match(/^(.*)\{(.*) => (.*)\}(.*)$/)
+	if (brace) {
+		let pre = brace[1] || ''
+		let post = brace[4] || ''
+		let join = (/** @type {string} */ mid) => (pre + mid + post).replace(/\/{2,}/g, '/')
+		return { old_path: join(brace[2] || ''), new_path: join(brace[3] || '') }
+	}
+	let split = spec.split(' => ')
+	let from = split[0] || ''
+	return { old_path: from, new_path: split[1] || from }
+}
+
 function git_numstat_summary_to_changes_array(/** @type {string} */ out) {
 	return Object.values(out.split('\n').filter(Boolean)
 		.reduce((/** @type {Record<string, FileDiff>} */ all, line) => {
@@ -140,12 +159,15 @@ function git_numstat_summary_to_changes_array(/** @type {string} */ out) {
 						else if (split[1] === 'create')
 							all[path].is_creation = true
 				} else if (split[1] === 'rename') {
-					// TODO: this is very hacky, --summary output is obviously not meant to be parsed
+					// --summary output is obviously not meant to be parsed
 					// rename Theme/Chicago95/{index.theme => index1.theme} (100%)
-					let match = line.match(/^ rename ((.+) => .+) \(\d+%\)$/)
-					let change = all[(match?.[2] || '').replaceAll('{', '')]
-					if (change)
-						change.rename_path = match?.[1]
+					let match = line.match(/^ rename (.+) \(\d+%\)$/)
+					let spec = match?.[1] || ''
+					if (spec) {
+						let change = all[split_rename(spec).old_path]
+						if (change)
+							change.rename_path = spec
+					}
 				}
 			} else {
 				let split = line.split('\t')
@@ -154,7 +176,7 @@ function git_numstat_summary_to_changes_array(/** @type {string} */ out) {
 				let rename_description = undefined
 				if (path.includes(' => ')) {
 					rename_description = path
-					path = path.split(' => ')[0]?.replaceAll('{', '') || ''
+					path = split_rename(path).old_path
 				}
 				all[path] = {
 					path,
