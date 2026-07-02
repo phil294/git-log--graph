@@ -38,20 +38,20 @@
 		</template-file-change-define>
 		<template-file-actions-define v-slot="{ file }">
 			<div class="file-actions row align-center">
-				<button class="row show-file" title="Show file history" @click.stop="show_file(file.path)">
+				<button class="row show-file" title="Show file history" @click.stop="show_file(file)">
 					<i class="codicon codicon-history" />
 				</button>
-				<button class="row view-rev" title="View File at this Revision" @click.stop="view_rev(file.path)">
+				<button class="row view-rev" title="View File at this Revision" @click.stop="view_rev(file)">
 					<i class="codicon codicon-git-commit" />
 				</button>
-				<button class="row open-file" title="Open file" @click.stop="open_file(file.path)">
+				<button class="row open-file" title="Open file" @click.stop="open_file(file)">
 					<i class="codicon codicon-go-to-file" />
 				</button>
 			</div>
 		</template-file-actions-define>
 
 		<ul v-if="files_list" class="list">
-			<li v-for="file of files_list" :key="file.path" class="list-row flex-1 row align-center gap-10" role="button" @click="show_diff(file.path)">
+			<li v-for="file of files_list" :key="file.path" class="list-row flex-1 row align-center gap-10" role="button" @click="show_diff(file)">
 				<div class="flex-1 fill-h row align-center gap-10">
 					<img :src="file.icon_path" aria-hidden="true">
 					<div :title="file.filename" class="filename">
@@ -74,7 +74,7 @@
 				<div class="body">
 					<template-tree-node-reuse v-for="child of node.children" :key="child.path" :node="child" />
 					<template v-for="file of node.files" :key="file.path">
-						<button class="fill-w row align-center gap-10" @click="show_diff(file.path)">
+						<button class="fill-w row align-center gap-10" @click="show_diff(file)">
 							<img :src="file.icon_path" aria-hidden="true">
 							<div :title="file.filename" class="filename flex-1">
 								{{ file.filename }}
@@ -102,6 +102,7 @@ import state from '../data/state.js'
 /**
  * @typedef {{
  *	path: string
+ *	new_path: string
  *	insertions: number
  *	deletions: number
  *  is_deletion?: boolean
@@ -127,6 +128,25 @@ let props = defineProps({
 /** @type {Vue.Ref<FileDiff[] | null>} */
 let file_diffs = ref(null)
 
+/**
+ * Expand git's compact rename spec into its old and new paths.
+ * Handles `dir/{old => new}/file`, `{old => new}/file`, `dir/{ => new}/file`,
+ * `dir/{old => }/file` and the plain `old => new` form.
+ * @type {(spec: string) => { old_path: string, new_path: string }}
+ */
+function split_rename(spec) {
+	let brace = spec.match(/^(.*)\{(.*) => (.*)\}(.*)$/)
+	if (brace) {
+		let pre = brace[1] || ''
+		let post = brace[4] || ''
+		let join = (/** @type {string} */ mid) => (pre + mid + post).replace(/\/{2,}/g, '/')
+		return { old_path: join(brace[2] || ''), new_path: join(brace[3] || '') }
+	}
+	let split = spec.split(' => ')
+	let from = split[0] || ''
+	return { old_path: from, new_path: split[1] || from }
+}
+
 function git_numstat_summary_to_changes_array(/** @type {string} */ out) {
 	return Object.values(out.split('\n').filter(Boolean)
 		.reduce((/** @type {Record<string, FileDiff>} */ all, line) => {
@@ -140,24 +160,31 @@ function git_numstat_summary_to_changes_array(/** @type {string} */ out) {
 						else if (split[1] === 'create')
 							all[path].is_creation = true
 				} else if (split[1] === 'rename') {
-					// TODO: this is very hacky, --summary output is obviously not meant to be parsed
+					// --summary output is obviously not meant to be parsed
 					// rename Theme/Chicago95/{index.theme => index1.theme} (100%)
-					let match = line.match(/^ rename ((.+) => .+) \(\d+%\)$/)
-					let change = all[(match?.[2] || '').replaceAll('{', '')]
-					if (change)
-						change.rename_path = match?.[1]
+					let match = line.match(/^ rename (.+) \(\d+%\)$/)
+					let spec = match?.[1] || ''
+					if (spec) {
+						let change = all[split_rename(spec).old_path]
+						if (change)
+							change.rename_path = spec
+					}
 				}
 			} else {
 				let split = line.split('\t')
 				let path = split[2] || ''
+				let new_path = path
 				/** @type {string | undefined} */
 				let rename_description = undefined
 				if (path.includes(' => ')) {
 					rename_description = path
-					path = path.split(' => ')[0]?.replaceAll('{', '') || ''
+					let renamed = split_rename(path)
+					path = renamed.old_path
+					new_path = renamed.new_path
 				}
 				all[path] = {
 					path,
+					new_path,
 					insertions: Number(split[0]),
 					deletions: Number(split[1]),
 					rename_path: rename_description,
@@ -194,12 +221,15 @@ watchEffect(async () => {
 	file_diffs.value = git_numstat_summary_to_changes_array(await git(get_files_command))
 })
 
-function show_diff(/** @type {string} */ filepath) {
+// For a renamed file the old name (file.path) exists only in hash1 and the new
+// name (file.new_path) only in hash2, so each side must use its own path — using
+// one path for both revisions yields an empty pane on the side where it's absent.
+function show_diff(/** @type {FileDiff} */ file) {
 	return exchange_message('open-diff', {
-		title: `${filepath} ${hash1.value} - ${hash2(filepath)}`,
+		title: `${file.new_path} ${hash1.value} - ${hash2(file.path)}`,
 		uris: [
-			`${hash1.value}:${filepath}`,
-			`${hash2(filepath)}:${filepath}`,
+			`${hash1.value}:${file.path}`,
+			`${hash2(file.path)}:${file.new_path}`,
 		],
 	})
 }
@@ -208,24 +238,24 @@ function show_multi_diff() {
 		title: `${hash1.value} - ${hash2()}`,
 		uris: (file_diffs.value || []).map(file => [
 			`${hash1.value}:${file.path}`,
-			`${hash2(file.path)}:${file.path}`,
+			`${hash2(file.path)}:${file.new_path}`,
 		]),
 	})
 }
-function view_rev(/** @type {string} */ filepath) {
+function view_rev(/** @type {FileDiff} */ file) {
 	return exchange_message('view-rev', {
-		uri: `${hash2(filepath)}:${filepath}`,
+		uri: `${hash2(file.path)}:${file.new_path}`,
 	})
 }
 
-function open_file(/** @type {string} */ filepath) {
-	return exchange_message('open-file', { uri: filepath })
+function open_file(/** @type {FileDiff} */ file) {
+	return exchange_message('open-file', { uri: file.new_path })
 }
 
-function show_file(/** @type {string} */ filepath) {
+function show_file(/** @type {FileDiff} */ file) {
 	return trigger_main_refresh({
 		custom_log_args: ({ base_log_args }) =>
-			`${base_log_args} --follow -- "${filepath}"`,
+			`${base_log_args} --follow -- "${file.new_path}"`,
 		fetch_stash_refs: false,
 	})
 }
