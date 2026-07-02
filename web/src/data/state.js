@@ -1,10 +1,10 @@
 import { computed, nextTick, shallowRef } from 'vue'
 import { add_push_listener, exchange_message } from '../bridge'
 
-/** @typedef {import('.../../src/state').StateKey} StateKey */
+/** @typedef {import('../../../src/state').StateKey} StateKey */
 /**
  * @template {StateKey} K
- * @typedef {import('.../../src/state').StateType<K>} StateType
+ * @typedef {import('../../../src/state').StateType<K>} StateType
  */
 /**
  * @template {StateKey} K

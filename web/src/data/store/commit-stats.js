@@ -16,7 +16,7 @@ export let update_commit_stats = async (/** @type {Commit[]} */ commits_, level 
 	commits_.forEach(commit => commit.stats = {}) // Prevent from running them twice
 	update_commit_stats_fast(commits_) // async
 	if (is_updating_commit_stats)
-		return queued_commits_for_update_stats.push(...commits_)
+		return void queued_commits_for_update_stats.push(...commits_)
 	is_updating_commit_stats = true
 	await update_commit_stats_full(commits_)
 	is_updating_commit_stats = false

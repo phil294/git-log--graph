@@ -171,6 +171,7 @@ module.exports.activate = intercept_errors(function(/** @type {vscode.ExtensionC
 							crypto.createHash('sha256').update(data).digest('hex'))
 					}
 			}
+			return undefined
 		}))
 
 		vscode.workspace.onDidChangeConfiguration(intercept_errors((event) => {
@@ -259,9 +260,9 @@ module.exports.activate = intercept_errors(function(/** @type {vscode.ExtensionC
 	// Close the editor(tab)
 	context.subscriptions.push(vscode.commands.registerCommand('git-log--graph.close', intercept_errors(() => {
 		if (get_config().get('position') !== 'editor')
-			return vscode.window.showInformationMessage('This command can only be used if GitLG isn\'t configured as a main editor (tab).')
+			return void vscode.window.showInformationMessage('This command can only be used if GitLG isn\'t configured as a main editor (tab).')
 		if (! webview_container)
-			return vscode.window.showInformationMessage('GitLG editor tab is not running.')
+			return void vscode.window.showInformationMessage('GitLG editor tab is not running.')
 		logger.info('close command');
 		/** @type {vscode.WebviewPanel} */ (webview_container).dispose()
 	})))

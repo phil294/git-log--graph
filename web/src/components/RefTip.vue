@@ -83,6 +83,7 @@ let container_class = computed(() => ({
 let drag = computed(() => {
 	if (branch.value)
 		return props.git_ref.display_name
+	return undefined
 })
 function drop(/** @type {import('../directives/drop').DropCallbackPayload} */ event) {
 	if (! branch.value)
@@ -107,6 +108,7 @@ let context_menu_provider = computed(() => () => {
 		return to_context_menu_entries(stash_actions(props.git_ref.name).value)
 	else if (props.git_ref.type === 'tag')
 		return to_context_menu_entries(tag_actions(props.git_ref.name).value)
+	return undefined
 })
 function dblclick() {
 	if (! branch.value)

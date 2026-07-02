@@ -266,6 +266,7 @@ let files_as_list = computed(() =>
 let files_list = computed(() => {
 	if (render_style?.value === 'list')
 		return files_as_list.value
+	return undefined
 })
 let files_tree = computed(() => {
 	if (render_style?.value !== 'tree')

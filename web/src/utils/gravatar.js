@@ -46,7 +46,8 @@ async function download_as_base64(/** @type {string} */ url) {
 	if (! response.ok)
 		throw new Error(`Failed to fetch url, status ${String(response.status)}`)
 	// Throws on Chrome<140 / VSCode<Nov2025
-	return new Uint8Array(await (await response.blob()).arrayBuffer()).toBase64()
+	// `toBase64` is newer than the TS lib types know about (see comment above)
+	return /** @type {{ toBase64(): string }} */ (/** @type {unknown} */ (new Uint8Array(await (await response.blob()).arrayBuffer()))).toBase64()
 }
 
 export async function get_avatar(/** @type {string} */ email_unsafe) {

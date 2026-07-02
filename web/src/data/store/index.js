@@ -51,8 +51,10 @@ export let _run_main_refresh = async (log_args, { fetch_stash_refs, fetch_branch
 		web_phase.value = 'refreshing'
 	if (web_phase.value === 'initializing_repo') {
 		repo_store._protected.unset()
-		if (! selected_repo_path_is_valid.value)
-			return web_phase.value = 'ready'
+		if (! selected_repo_path_is_valid.value) {
+			web_phase.value = 'ready'
+			return
+		}
 		refresh_repo_states()
 		preliminary_loading = ! config.get_boolean_or_undefined('disable-preliminary-loading')
 	}

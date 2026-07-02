@@ -6,7 +6,8 @@
     "../src/global.d.ts"
   ],
   "compilerOptions": {
-    "types": ["vite/client"],
+    "types": ["vite/client", "node"],
+    "rootDir": "..",
   },
   "vueCompilerOptions": {
     "strictTemplates": true,

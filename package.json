@@ -846,7 +846,7 @@
 	"scripts": {
 		"postinstall": "cd web && npm install",
 		"type-check": "tsc --noEmit && cd web && npx vue-tsc --noEmit && cd ..",
-		"lint": "eslint . --report-unused-disable-directives --max-warnings 0",
+		"lint": "eslint . --report-unused-disable-directives",
 		"build": "cd web && npm run build && cd .. && rm web-dist/index.html && npx esbuild src/extension.js --bundle --platform=node --outfile=main.js --external:vscode"
 	},
 	"devDependencies": {

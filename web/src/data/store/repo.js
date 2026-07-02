@@ -142,4 +142,5 @@ export let selected_commits = computed({
 export let single_selected_commit = computed(() => {
 	if (selected_commits.value.length === 1)
 		return selected_commits.value[0]
+	return undefined
 })
